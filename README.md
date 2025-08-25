@@ -1,5 +1,8 @@
 # Mounted Volume Sync Documentation
 
+TLDR;
+You should mount volume `/app/mounted-volume` to persist, edit, and backup your application files.
+
 ## Overview
 This document explains the synchronization process between the application directory (`/app`) and the mounted volume (`/app/mounted-volume`) in the containerized environment.
 
