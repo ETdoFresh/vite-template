@@ -29,10 +29,17 @@ function setupMountedVolume() {
   if (isEmpty) {
     console.log('Mounted volume is empty, copying initial files from /app...');
     
-    // Get all items in /app excluding certain directories
-    const appItems = fs.readdirSync('/app').filter(item => 
-      !excludedDirs.includes(item) && !excludedFiles.includes(item)
-    );
+    // Get all items in /app
+    const allAppItems = fs.readdirSync('/app');
+    
+    // Log and filter out excluded items
+    const appItems = allAppItems.filter(item => {
+      if (excludedDirs.includes(item) || excludedFiles.includes(item)) {
+        console.log(`Ignoring excluded item in /app: ${item}`);
+        return false;
+      }
+      return true;
+    });
     
     // Copy each item to mounted volume
     appItems.forEach(item => {
@@ -61,49 +68,35 @@ function setupMountedVolume() {
     
     console.log('Initial copy completed');
   } else {
-    console.log('Mounted volume contains data, syncing with /app...');
+    console.log('Mounted volume contains data, merging with /app...');
+    // Merge strategy: Keep files from mounted volume, add missing files from /app
+    mergeMountedWithApp();
   }
-  
-  // Now sync from mounted volume back to /app
-  // This ensures mounted volume is the source of truth
-  syncFromMountedVolume();
 }
 
-function syncFromMountedVolume() {
+function mergeMountedWithApp() {
   if (!fs.existsSync('/app') || !fs.existsSync(mountedVolumeDir)) {
     return;
   }
   
-  // Get all items in mounted volume
+  // Get all items in both directories
   const mountedItems = fs.readdirSync(mountedVolumeDir);
   
-  // Get all items in /app (excluding our excluded dirs)
-  const appItems = fs.readdirSync('/app').filter(item => 
-    !excludedDirs.includes(item) && !excludedFiles.includes(item)
-  );
-  
-  // Remove items from /app that don't exist in mounted volume
-  appItems.forEach(item => {
-    if (!mountedItems.includes(item)) {
-      const itemPath = path.join('/app', item);
-      try {
-        const stats = fs.lstatSync(itemPath);
-        if (stats.isDirectory()) {
-          fs.rmSync(itemPath, { recursive: true, force: true });
-        } else {
-          fs.unlinkSync(itemPath);
-        }
-        console.log(`Removed from /app: ${item} (not in mounted volume)`);
-      } catch (error) {
-        console.error(`Error removing ${item}:`, error.message);
-      }
+  // Get and filter app items with logging
+  const allAppItems = fs.readdirSync('/app');
+  const appItems = allAppItems.filter(item => {
+    if (excludedDirs.includes(item) || excludedFiles.includes(item)) {
+      console.log(`Ignoring excluded item in /app: ${item}`);
+      return false;
     }
+    return true;
   });
   
-  // Copy items from mounted volume to /app (overwriting existing)
+  // First, copy items from mounted volume to /app (these take priority)
   mountedItems.forEach(item => {
     // Skip excluded items
     if (excludedDirs.includes(item) || excludedFiles.includes(item)) {
+      console.log(`Ignoring excluded item from mounted volume: ${item}`);
       return;
     }
     
@@ -111,6 +104,12 @@ function syncFromMountedVolume() {
     const destPath = path.join('/app', item);
     
     try {
+      // Check if source actually exists (handle broken symlinks, etc)
+      if (!fs.existsSync(sourcePath)) {
+        console.log(`Skipping non-existent item in mounted volume: ${item}`);
+        return;
+      }
+      
       // Remove existing item in /app if it exists
       if (fs.existsSync(destPath)) {
         const stats = fs.lstatSync(destPath);
@@ -128,9 +127,35 @@ function syncFromMountedVolume() {
       } else {
         execSync(`cp "${sourcePath}" "${destPath}"`);
       }
-      console.log(`Synced: ${item}`);
+      console.log(`Restored from mounted volume: ${item}`);
     } catch (error) {
-      console.error(`Error syncing ${item}:`, error.message);
+      console.error(`Error restoring ${item}:`, error.message);
+    }
+  });
+  
+  // Then, copy items that exist in /app but not in mounted volume
+  appItems.forEach(item => {
+    if (!mountedItems.includes(item)) {
+      const sourcePath = path.join('/app', item);
+      const destPath = path.join(mountedVolumeDir, item);
+      
+      try {
+        // Skip if source is a symlink
+        const stats = fs.lstatSync(sourcePath);
+        if (stats.isSymbolicLink()) {
+          return;
+        }
+        
+        // Copy from /app to mounted volume
+        if (stats.isDirectory()) {
+          execSync(`cp -r "${sourcePath}" "${destPath}"`);
+        } else {
+          execSync(`cp "${sourcePath}" "${destPath}"`);
+        }
+        console.log(`Added to mounted volume: ${item}`);
+      } catch (error) {
+        console.error(`Error adding ${item} to mounted volume:`, error.message);
+      }
     }
   });
 }
@@ -165,9 +190,11 @@ export default defineConfig({
         // Skip if file is in excluded directories or is an excluded file
         const pathParts = relativePath.split(path.sep);
         if (excludedDirs.some(dir => pathParts.includes(dir))) {
+          console.log(`Ignoring file in excluded directory: ${relativePath}`);
           return;
         }
         if (excludedFiles.includes(path.basename(file))) {
+          console.log(`Ignoring excluded file: ${relativePath}`);
           return;
         }
         
