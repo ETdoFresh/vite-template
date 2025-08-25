@@ -8,10 +8,18 @@ const mountedVolumeDir = '/app/mounted-volume';
 const excludedDirs = ['node_modules', '.git', 'mounted-volume', 'dist'];
 const excludedFiles = [];
 
+// Check if we're in build phase or runtime phase
+const isBuildPhase = process.env.NODE_ENV === 'production' && process.argv.includes('build');
+const isRuntime = !isBuildPhase && fs.existsSync(appDir);
+
 function setupMountedVolume() {
-  // Only run in production environment (when /app exists)
-  if (!fs.existsSync(appDir)) {
-    console.log('Not in production environment, skipping mounted volume setup');
+  // Only run at runtime in production environment (not during build)
+  if (!isRuntime) {
+    if (isBuildPhase) {
+      console.log('Build phase detected, skipping mounted volume setup');
+    } else {
+      console.log('Not in production environment, skipping mounted volume setup');
+    }
     return;
   }
 
@@ -105,7 +113,7 @@ function setupMountedVolume() {
 }
 
 function updateSymlinks() {
-  if (!fs.existsSync(appDir) || !fs.existsSync(mountedVolumeDir)) {
+  if (!isRuntime || !fs.existsSync(mountedVolumeDir)) {
     return;
   }
   
@@ -172,8 +180,10 @@ function updateSymlinks() {
   });
 }
 
-// Setup mounted volume on startup
-setupMountedVolume();
+// Only setup mounted volume at runtime, not during build
+if (!isBuildPhase) {
+  setupMountedVolume();
+}
 
 export default defineConfig({
   server: {
@@ -187,12 +197,17 @@ export default defineConfig({
       interval: 1000
     }
   },
+  build: {
+    // During build, output to dist directory as normal
+    outDir: 'dist',
+    emptyOutDir: true
+  },
   plugins: [
     {
       name: 'sync-symlinks-on-change',
       configureServer(server) {
-        // Watch the mounted volume for file additions/deletions
-        if (!fs.existsSync(mountedVolumeDir)) {
+        // Only set up watcher at runtime
+        if (!isRuntime || !fs.existsSync(mountedVolumeDir)) {
           return;
         }
         
@@ -221,11 +236,13 @@ export default defineConfig({
         // We just need to handle file additions/deletions which are handled by the watcher above.
         
         // Log the file change for debugging
-        const relativePath = path.relative(appDir, file);
-        if (!relativePath.startsWith('mounted-volume') && 
-            !relativePath.startsWith('node_modules') &&
-            !relativePath.startsWith('.git')) {
-          console.log(`File updated through symlink: ${relativePath}`);
+        if (isRuntime) {
+          const relativePath = path.relative(appDir, file);
+          if (!relativePath.startsWith('mounted-volume') && 
+              !relativePath.startsWith('node_modules') &&
+              !relativePath.startsWith('.git')) {
+            console.log(`File updated through symlink: ${relativePath}`);
+          }
         }
       }
     }
