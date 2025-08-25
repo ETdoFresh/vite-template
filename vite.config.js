@@ -3,20 +3,21 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
+const appDir = '/app';
 const mountedVolumeDir = '/app/mounted-volume';
 const excludedDirs = ['node_modules', '.git', 'mounted-volume', 'dist'];
-const excludedFiles = ['startup.js', 'sync-backup.js'];
+const excludedFiles = [];
 
 function setupMountedVolume() {
   // Only run in production environment (when /app exists)
-  if (!fs.existsSync('/app')) {
+  if (!fs.existsSync(appDir)) {
     console.log('Not in production environment, skipping mounted volume setup');
     return;
   }
 
-  console.log('Setting up mounted volume...');
+  console.log('=== Starting Mounted Volume Setup ===');
   
-  // Create mounted-volume directory if it doesn't exist
+  // Step 1: Create mounted-volume directory if it doesn't exist
   if (!fs.existsSync(mountedVolumeDir)) {
     fs.mkdirSync(mountedVolumeDir, { recursive: true });
     console.log(`Created mounted-volume directory: ${mountedVolumeDir}`);
@@ -26,136 +27,147 @@ function setupMountedVolume() {
   const mountedFiles = fs.readdirSync(mountedVolumeDir);
   const isEmpty = mountedFiles.length === 0;
   
+  // Step 1: If mounted volume is empty, copy initial files from /app
   if (isEmpty) {
-    console.log('Mounted volume is empty, copying initial files from /app...');
+    console.log('Step 1: Mounted volume is empty, copying initial files from /app...');
     
-    // Get all items in /app
-    const allAppItems = fs.readdirSync('/app');
-    
-    // Log and filter out excluded items
-    const appItems = allAppItems.filter(item => {
+    const allItems = fs.readdirSync(appDir);
+    allItems.forEach(item => {
       if (excludedDirs.includes(item) || excludedFiles.includes(item)) {
-        console.log(`Ignoring excluded item in /app: ${item}`);
-        return false;
+        console.log(`  Skipping excluded item: ${item}`);
+        return;
       }
-      return true;
-    });
-    
-    // Copy each item to mounted volume
-    appItems.forEach(item => {
-      const sourcePath = path.join('/app', item);
+      
+      const sourcePath = path.join(appDir, item);
       const destPath = path.join(mountedVolumeDir, item);
       
       try {
         const stats = fs.lstatSync(sourcePath);
         
-        // Skip if it's already a symlink (shouldn't happen on first run)
+        // Skip if it's already a symlink (from a previous run)
         if (stats.isSymbolicLink()) {
+          console.log(`  Skipping symlink: ${item}`);
           return;
         }
         
-        // Use cp -r for directories, cp for files
+        // Copy to mounted volume
         if (stats.isDirectory()) {
           execSync(`cp -r "${sourcePath}" "${destPath}"`);
         } else {
           execSync(`cp "${sourcePath}" "${destPath}"`);
         }
-        console.log(`Copied: ${item}`);
+        console.log(`  Copied to mounted volume: ${item}`);
       } catch (error) {
-        console.error(`Error copying ${item}:`, error.message);
+        console.error(`  Error copying ${item}:`, error.message);
       }
     });
     
-    console.log('Initial copy completed');
+    console.log('Initial copy to mounted volume completed');
   } else {
-    console.log('Mounted volume contains data, merging with /app...');
-    // Merge strategy: Keep files from mounted volume, add missing files from /app
-    mergeMountedWithApp();
+    console.log('Mounted volume already contains data');
   }
+  
+  // Step 2: Delete all files from /app except excluded directories
+  console.log('\nStep 2: Cleaning /app directory (keeping only excluded items)...');
+  const appItems = fs.readdirSync(appDir);
+  
+  appItems.forEach(item => {
+    if (excludedDirs.includes(item) || excludedFiles.includes(item)) {
+      console.log(`  Keeping excluded item: ${item}`);
+      return;
+    }
+    
+    const itemPath = path.join(appDir, item);
+    try {
+      const stats = fs.lstatSync(itemPath);
+      
+      // Remove the item (whether it's a file, directory, or symlink)
+      if (stats.isSymbolicLink()) {
+        fs.unlinkSync(itemPath);
+        console.log(`  Removed symlink: ${item}`);
+      } else if (stats.isDirectory()) {
+        fs.rmSync(itemPath, { recursive: true, force: true });
+        console.log(`  Removed directory: ${item}`);
+      } else {
+        fs.unlinkSync(itemPath);
+        console.log(`  Removed file: ${item}`);
+      }
+    } catch (error) {
+      console.error(`  Error removing ${item}:`, error.message);
+    }
+  });
+  
+  // Step 3: Create symlinks from /app to /app/mounted-volume
+  console.log('\nStep 3: Creating symlinks from /app to mounted volume...');
+  updateSymlinks();
+  
+  console.log('\n=== Mounted Volume Setup Complete ===\n');
 }
 
-function mergeMountedWithApp() {
-  if (!fs.existsSync('/app') || !fs.existsSync(mountedVolumeDir)) {
+function updateSymlinks() {
+  if (!fs.existsSync(appDir) || !fs.existsSync(mountedVolumeDir)) {
     return;
   }
   
-  // Get all items in both directories
+  // Get current state of both directories
   const mountedItems = fs.readdirSync(mountedVolumeDir);
+  const appItems = fs.readdirSync(appDir);
   
-  // Get and filter app items with logging
-  const allAppItems = fs.readdirSync('/app');
-  const appItems = allAppItems.filter(item => {
+  // Remove symlinks that no longer have a corresponding file in mounted volume
+  appItems.forEach(item => {
     if (excludedDirs.includes(item) || excludedFiles.includes(item)) {
-      console.log(`Ignoring excluded item in /app: ${item}`);
-      return false;
+      return; // Skip excluded items
     }
-    return true;
+    
+    const itemPath = path.join(appDir, item);
+    try {
+      const stats = fs.lstatSync(itemPath);
+      if (stats.isSymbolicLink() && !mountedItems.includes(item)) {
+        fs.unlinkSync(itemPath);
+        console.log(`  Removed orphaned symlink: ${item}`);
+      }
+    } catch (error) {
+      // Item might have been removed already
+    }
   });
   
-  // First, copy items from mounted volume to /app (these take priority)
+  // Create symlinks for all items in mounted volume
   mountedItems.forEach(item => {
-    // Skip excluded items
     if (excludedDirs.includes(item) || excludedFiles.includes(item)) {
-      console.log(`Ignoring excluded item from mounted volume: ${item}`);
+      console.log(`  Skipping excluded item: ${item}`);
       return;
     }
     
     const sourcePath = path.join(mountedVolumeDir, item);
-    const destPath = path.join('/app', item);
+    const linkPath = path.join(appDir, item);
     
     try {
-      // Check if source actually exists (handle broken symlinks, etc)
-      if (!fs.existsSync(sourcePath)) {
-        console.log(`Skipping non-existent item in mounted volume: ${item}`);
-        return;
-      }
-      
-      // Remove existing item in /app if it exists
-      if (fs.existsSync(destPath)) {
-        const stats = fs.lstatSync(destPath);
-        if (stats.isDirectory()) {
-          fs.rmSync(destPath, { recursive: true, force: true });
-        } else {
-          fs.unlinkSync(destPath);
-        }
-      }
-      
-      // Copy from mounted volume to /app
-      const sourceStats = fs.statSync(sourcePath);
-      if (sourceStats.isDirectory()) {
-        execSync(`cp -r "${sourcePath}" "${destPath}"`);
-      } else {
-        execSync(`cp "${sourcePath}" "${destPath}"`);
-      }
-      console.log(`Restored from mounted volume: ${item}`);
-    } catch (error) {
-      console.error(`Error restoring ${item}:`, error.message);
-    }
-  });
-  
-  // Then, copy items that exist in /app but not in mounted volume
-  appItems.forEach(item => {
-    if (!mountedItems.includes(item)) {
-      const sourcePath = path.join('/app', item);
-      const destPath = path.join(mountedVolumeDir, item);
-      
-      try {
-        // Skip if source is a symlink
-        const stats = fs.lstatSync(sourcePath);
+      // Check if symlink already exists and is correct
+      if (fs.existsSync(linkPath)) {
+        const stats = fs.lstatSync(linkPath);
         if (stats.isSymbolicLink()) {
-          return;
-        }
-        
-        // Copy from /app to mounted volume
-        if (stats.isDirectory()) {
-          execSync(`cp -r "${sourcePath}" "${destPath}"`);
+          const currentTarget = fs.readlinkSync(linkPath);
+          if (currentTarget === sourcePath) {
+            // Symlink already exists and points to the right place
+            return;
+          }
+          // Remove incorrect symlink
+          fs.unlinkSync(linkPath);
         } else {
-          execSync(`cp "${sourcePath}" "${destPath}"`);
+          // Non-symlink exists, remove it
+          if (stats.isDirectory()) {
+            fs.rmSync(linkPath, { recursive: true, force: true });
+          } else {
+            fs.unlinkSync(linkPath);
+          }
         }
-        console.log(`Added to mounted volume: ${item}`);
-      } catch (error) {
-        console.error(`Error adding ${item} to mounted volume:`, error.message);
       }
+      
+      // Create new symlink
+      fs.symlinkSync(sourcePath, linkPath);
+      console.log(`  Created symlink: ${item} -> mounted-volume/${item}`);
+    } catch (error) {
+      console.error(`  Error creating symlink for ${item}:`, error.message);
     }
   });
 }
@@ -168,8 +180,8 @@ export default defineConfig({
     host: true,
     allowedHosts: ['.etdofresh.com'],
     watch: {
-      // Ignore the mounted-volume directory to prevent loops
-      ignored: ['**/mounted-volume/**', '**/node_modules/**'],
+      // Watch the actual files through symlinks, not the mounted volume directly
+      ignored: ['**/node_modules/**', '**/mounted-volume/**', '**/.git/**'],
       // Use polling in container environments
       usePolling: true,
       interval: 1000
@@ -177,47 +189,43 @@ export default defineConfig({
   },
   plugins: [
     {
-      name: 'sync-to-mounted-volume',
-      handleHotUpdate({ file, server }) {
-        // Only sync if we're in production environment
-        if (!fs.existsSync('/app') || !fs.existsSync(mountedVolumeDir)) {
+      name: 'sync-symlinks-on-change',
+      configureServer(server) {
+        // Watch the mounted volume for file additions/deletions
+        if (!fs.existsSync(mountedVolumeDir)) {
           return;
         }
         
-        // Get relative path from /app
-        const relativePath = path.relative('/app', file);
-        
-        // Skip if file is in excluded directories or is an excluded file
-        const pathParts = relativePath.split(path.sep);
-        if (excludedDirs.some(dir => pathParts.includes(dir))) {
-          console.log(`Ignoring file in excluded directory: ${relativePath}`);
-          return;
-        }
-        if (excludedFiles.includes(path.basename(file))) {
-          console.log(`Ignoring excluded file: ${relativePath}`);
-          return;
-        }
-        
-        // Skip if file is in mounted-volume directory
-        if (file.startsWith(mountedVolumeDir)) {
-          return;
-        }
-        
-        // Sync the changed file to mounted volume
-        const destPath = path.join(mountedVolumeDir, relativePath);
-        
-        try {
-          // Ensure destination directory exists
-          const destDir = path.dirname(destPath);
-          if (!fs.existsSync(destDir)) {
-            fs.mkdirSync(destDir, { recursive: true });
+        // Set up a watcher for the mounted volume
+        const watcher = fs.watch(mountedVolumeDir, { recursive: true }, (eventType, filename) => {
+          if (!filename) return;
+          
+          // Skip excluded directories
+          if (excludedDirs.some(dir => filename.includes(dir))) {
+            return;
           }
           
-          // Copy the file to mounted volume
-          fs.copyFileSync(file, destPath);
-          console.log(`Synced to mounted volume: ${relativePath}`);
-        } catch (error) {
-          console.error(`Error syncing ${relativePath}:`, error.message);
+          console.log(`\nDetected ${eventType} in mounted volume: ${filename}`);
+          console.log('Updating symlinks...');
+          updateSymlinks();
+        });
+        
+        // Clean up watcher on server close
+        server.httpServer?.on('close', () => {
+          watcher.close();
+        });
+      },
+      handleHotUpdate({ file, server }) {
+        // When a file changes through the symlink, the actual file in mounted volume
+        // is already updated (because the symlink points there).
+        // We just need to handle file additions/deletions which are handled by the watcher above.
+        
+        // Log the file change for debugging
+        const relativePath = path.relative(appDir, file);
+        if (!relativePath.startsWith('mounted-volume') && 
+            !relativePath.startsWith('node_modules') &&
+            !relativePath.startsWith('.git')) {
+          console.log(`File updated through symlink: ${relativePath}`);
         }
       }
     }
