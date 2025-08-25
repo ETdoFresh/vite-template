@@ -34,8 +34,9 @@ This document explains the synchronization process between the application direc
 
 2. **Clean Mounted Volume**:
    - Remove any symlinks from `/app/mounted-volume` 
+   - Remove `.git` and `.nixpacks` directories (these belong only in `/app`)
    - Symlinks should never exist in the mounted volume as it's the source of truth
-   - This prevents circular reference errors
+   - This prevents circular reference errors and keeps the volume clean
 
 3. **Initialize Mounted Volume**:
    - If `/app/mounted-volume` doesn't exist, create it

@@ -43,9 +43,23 @@ function cleanSymlinksFromMountedVolume() {
     const itemPath = path.join(mountedVolumeDir, item);
     try {
       const stats = fs.lstatSync(itemPath);
+      
+      // Remove symlinks
       if (stats.isSymbolicLink()) {
         fs.unlinkSync(itemPath);
         console.log(`  Removed symlink from mounted volume: ${item}`);
+        return;
+      }
+      
+      // Remove excluded directories that shouldn't be in mounted volume
+      if (item === '.git' || item === '.nixpacks') {
+        if (stats.isDirectory()) {
+          fs.rmSync(itemPath, { recursive: true, force: true });
+          console.log(`  Removed excluded directory from mounted volume: ${item}`);
+        } else {
+          fs.unlinkSync(itemPath);
+          console.log(`  Removed excluded file from mounted volume: ${item}`);
+        }
       }
     } catch (error) {
       console.error(`  Error checking/removing ${item}:`, error.message);
@@ -72,8 +86,8 @@ function setupMountedVolume() {
     console.log(`Created mounted-volume directory: ${mountedVolumeDir}`);
   }
   
-  // Clean up any symlinks in the mounted volume (they shouldn't be there)
-  console.log('\nStep 1a: Cleaning symlinks from mounted volume...');
+  // Clean up any symlinks and excluded directories from mounted volume
+  console.log('\nStep 1a: Cleaning mounted volume (removing symlinks, .git, .nixpacks)...');
   cleanSymlinksFromMountedVolume();
   
   // Check if mounted volume is empty
