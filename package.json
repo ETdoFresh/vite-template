@@ -4,11 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node startup.js",
-    "dev": "node startup.js",
+    "start": "vite --host 0.0.0.0 --port 5173",
+    "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "sync-backup": "node sync-backup.js"
+    "preview": "vite preview"
   },
   "keywords": [],
   "author": "",

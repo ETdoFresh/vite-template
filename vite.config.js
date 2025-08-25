@@ -1,8 +1,198 @@
 import { defineConfig } from 'vite';
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+
+const mountedVolumeDir = '/app/mounted-volume';
+const excludedDirs = ['node_modules', '.git', 'mounted-volume', 'dist'];
+const excludedFiles = ['startup.js', 'sync-backup.js'];
+
+function setupMountedVolume() {
+  // Only run in production environment (when /app exists)
+  if (!fs.existsSync('/app')) {
+    console.log('Not in production environment, skipping mounted volume setup');
+    return;
+  }
+
+  console.log('Setting up mounted volume...');
+  
+  // Create mounted-volume directory if it doesn't exist
+  if (!fs.existsSync(mountedVolumeDir)) {
+    fs.mkdirSync(mountedVolumeDir, { recursive: true });
+    console.log(`Created mounted-volume directory: ${mountedVolumeDir}`);
+  }
+  
+  // Check if mounted volume is empty
+  const mountedFiles = fs.readdirSync(mountedVolumeDir);
+  const isEmpty = mountedFiles.length === 0;
+  
+  if (isEmpty) {
+    console.log('Mounted volume is empty, copying initial files from /app...');
+    
+    // Get all items in /app excluding certain directories
+    const appItems = fs.readdirSync('/app').filter(item => 
+      !excludedDirs.includes(item) && !excludedFiles.includes(item)
+    );
+    
+    // Copy each item to mounted volume
+    appItems.forEach(item => {
+      const sourcePath = path.join('/app', item);
+      const destPath = path.join(mountedVolumeDir, item);
+      
+      try {
+        const stats = fs.lstatSync(sourcePath);
+        
+        // Skip if it's already a symlink (shouldn't happen on first run)
+        if (stats.isSymbolicLink()) {
+          return;
+        }
+        
+        // Use cp -r for directories, cp for files
+        if (stats.isDirectory()) {
+          execSync(`cp -r "${sourcePath}" "${destPath}"`);
+        } else {
+          execSync(`cp "${sourcePath}" "${destPath}"`);
+        }
+        console.log(`Copied: ${item}`);
+      } catch (error) {
+        console.error(`Error copying ${item}:`, error.message);
+      }
+    });
+    
+    console.log('Initial copy completed');
+  } else {
+    console.log('Mounted volume contains data, syncing with /app...');
+  }
+  
+  // Now sync from mounted volume back to /app
+  // This ensures mounted volume is the source of truth
+  syncFromMountedVolume();
+}
+
+function syncFromMountedVolume() {
+  if (!fs.existsSync('/app') || !fs.existsSync(mountedVolumeDir)) {
+    return;
+  }
+  
+  // Get all items in mounted volume
+  const mountedItems = fs.readdirSync(mountedVolumeDir);
+  
+  // Get all items in /app (excluding our excluded dirs)
+  const appItems = fs.readdirSync('/app').filter(item => 
+    !excludedDirs.includes(item) && !excludedFiles.includes(item)
+  );
+  
+  // Remove items from /app that don't exist in mounted volume
+  appItems.forEach(item => {
+    if (!mountedItems.includes(item)) {
+      const itemPath = path.join('/app', item);
+      try {
+        const stats = fs.lstatSync(itemPath);
+        if (stats.isDirectory()) {
+          fs.rmSync(itemPath, { recursive: true, force: true });
+        } else {
+          fs.unlinkSync(itemPath);
+        }
+        console.log(`Removed from /app: ${item} (not in mounted volume)`);
+      } catch (error) {
+        console.error(`Error removing ${item}:`, error.message);
+      }
+    }
+  });
+  
+  // Copy items from mounted volume to /app (overwriting existing)
+  mountedItems.forEach(item => {
+    // Skip excluded items
+    if (excludedDirs.includes(item) || excludedFiles.includes(item)) {
+      return;
+    }
+    
+    const sourcePath = path.join(mountedVolumeDir, item);
+    const destPath = path.join('/app', item);
+    
+    try {
+      // Remove existing item in /app if it exists
+      if (fs.existsSync(destPath)) {
+        const stats = fs.lstatSync(destPath);
+        if (stats.isDirectory()) {
+          fs.rmSync(destPath, { recursive: true, force: true });
+        } else {
+          fs.unlinkSync(destPath);
+        }
+      }
+      
+      // Copy from mounted volume to /app
+      const sourceStats = fs.statSync(sourcePath);
+      if (sourceStats.isDirectory()) {
+        execSync(`cp -r "${sourcePath}" "${destPath}"`);
+      } else {
+        execSync(`cp "${sourcePath}" "${destPath}"`);
+      }
+      console.log(`Synced: ${item}`);
+    } catch (error) {
+      console.error(`Error syncing ${item}:`, error.message);
+    }
+  });
+}
+
+// Setup mounted volume on startup
+setupMountedVolume();
 
 export default defineConfig({
   server: {
     host: true,
-    allowedHosts: ['.etdofresh.com']
-  }
+    allowedHosts: ['.etdofresh.com'],
+    watch: {
+      // Ignore the mounted-volume directory to prevent loops
+      ignored: ['**/mounted-volume/**', '**/node_modules/**'],
+      // Use polling in container environments
+      usePolling: true,
+      interval: 1000
+    }
+  },
+  plugins: [
+    {
+      name: 'sync-to-mounted-volume',
+      handleHotUpdate({ file, server }) {
+        // Only sync if we're in production environment
+        if (!fs.existsSync('/app') || !fs.existsSync(mountedVolumeDir)) {
+          return;
+        }
+        
+        // Get relative path from /app
+        const relativePath = path.relative('/app', file);
+        
+        // Skip if file is in excluded directories or is an excluded file
+        const pathParts = relativePath.split(path.sep);
+        if (excludedDirs.some(dir => pathParts.includes(dir))) {
+          return;
+        }
+        if (excludedFiles.includes(path.basename(file))) {
+          return;
+        }
+        
+        // Skip if file is in mounted-volume directory
+        if (file.startsWith(mountedVolumeDir)) {
+          return;
+        }
+        
+        // Sync the changed file to mounted volume
+        const destPath = path.join(mountedVolumeDir, relativePath);
+        
+        try {
+          // Ensure destination directory exists
+          const destDir = path.dirname(destPath);
+          if (!fs.existsSync(destDir)) {
+            fs.mkdirSync(destDir, { recursive: true });
+          }
+          
+          // Copy the file to mounted volume
+          fs.copyFileSync(file, destPath);
+          console.log(`Synced to mounted volume: ${relativePath}`);
+        } catch (error) {
+          console.error(`Error syncing ${relativePath}:`, error.message);
+        }
+      }
+    }
+  ]
 });
