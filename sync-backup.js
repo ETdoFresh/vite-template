@@ -14,9 +14,10 @@ export function syncToBackup() {
   
   // Use rsync to sync directories, excluding specified folders
   const rsyncCommand = `rsync -av --delete \
-    --exclude='node_modules' \
-    --exclude='.git' \
-    --exclude='backup' \
+    --exclude=node_modules \
+    --exclude=.git \
+    --exclude=backup \
+    --exclude=dist \
     ${sourceDir}/ ${backupDir}/`;
   
   try {
