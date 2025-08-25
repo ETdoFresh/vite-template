@@ -33,6 +33,26 @@ function isExcluded(filename) {
 const isBuildPhase = process.env.NODE_ENV === 'production' && process.argv.includes('build');
 const isRuntime = !isBuildPhase && fs.existsSync(appDir);
 
+function cleanSymlinksFromMountedVolume() {
+  if (!fs.existsSync(mountedVolumeDir)) {
+    return;
+  }
+  
+  const items = fs.readdirSync(mountedVolumeDir);
+  items.forEach(item => {
+    const itemPath = path.join(mountedVolumeDir, item);
+    try {
+      const stats = fs.lstatSync(itemPath);
+      if (stats.isSymbolicLink()) {
+        fs.unlinkSync(itemPath);
+        console.log(`  Removed symlink from mounted volume: ${item}`);
+      }
+    } catch (error) {
+      console.error(`  Error checking/removing ${item}:`, error.message);
+    }
+  });
+}
+
 function setupMountedVolume() {
   // Only run at runtime in production environment (not during build)
   if (!isRuntime) {
@@ -52,13 +72,17 @@ function setupMountedVolume() {
     console.log(`Created mounted-volume directory: ${mountedVolumeDir}`);
   }
   
+  // Clean up any symlinks in the mounted volume (they shouldn't be there)
+  console.log('\nStep 1a: Cleaning symlinks from mounted volume...');
+  cleanSymlinksFromMountedVolume();
+  
   // Check if mounted volume is empty
   const mountedFiles = fs.readdirSync(mountedVolumeDir);
   const isEmpty = mountedFiles.length === 0;
   
-  // Step 1: If mounted volume is empty, copy initial files from /app
+  // Step 2: If mounted volume is empty, copy initial files from /app
   if (isEmpty) {
-    console.log('Step 1: Mounted volume is empty, copying initial files from /app...');
+    console.log('\nStep 2: Mounted volume is empty, copying initial files from /app...');
     
     const allItems = fs.readdirSync(appDir);
     allItems.forEach(item => {
@@ -96,8 +120,8 @@ function setupMountedVolume() {
     console.log('Mounted volume already contains data');
   }
   
-  // Step 2: Delete all files from /app except excluded directories
-  console.log('\nStep 2: Cleaning /app directory (keeping only excluded items)...');
+  // Step 3: Delete all files from /app except excluded directories
+  console.log('\nStep 3: Cleaning /app directory (keeping only excluded items)...');
   const appItems = fs.readdirSync(appDir);
   
   appItems.forEach(item => {
@@ -126,8 +150,8 @@ function setupMountedVolume() {
     }
   });
   
-  // Step 3: Create symlinks from /app to /app/mounted-volume
-  console.log('\nStep 3: Creating symlinks from /app to mounted volume...');
+  // Step 4: Create symlinks from /app to /app/mounted-volume
+  console.log('\nStep 4: Creating symlinks from /app to mounted volume...');
   updateSymlinks();
   
   console.log('\n=== Mounted Volume Setup Complete ===\n');
@@ -190,6 +214,13 @@ function updateSymlinks() {
             fs.unlinkSync(linkPath);
           }
         }
+      }
+      
+      // Verify the source is not a symlink itself
+      const sourceStats = fs.lstatSync(sourcePath);
+      if (sourceStats.isSymbolicLink()) {
+        console.log(`  Warning: Source is a symlink, skipping: ${item}`);
+        return;
       }
       
       // Create new symlink

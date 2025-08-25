@@ -29,7 +29,12 @@ This document explains the synchronization process between the application direc
 
 1. **Check Environment**: The process only runs in production (when `/app` exists)
 
-2. **Initialize Mounted Volume**:
+2. **Clean Mounted Volume**:
+   - Remove any symlinks from `/app/mounted-volume` 
+   - Symlinks should never exist in the mounted volume as it's the source of truth
+   - This prevents circular reference errors
+
+3. **Initialize Mounted Volume**:
    - If `/app/mounted-volume` doesn't exist, create it
    - If mounted volume is empty, copy all files from `/app` to `/app/mounted-volume`
    - Excluded directories/files are never copied:
@@ -37,13 +42,16 @@ This document explains the synchronization process between the application direc
      - `.git/` - Version control stays in app directory
      - `mounted-volume/` - Avoid recursion
      - `dist/` - Build artifacts
+     - `*.timestamp-*.mjs` - Vite temporary files
+     - `.*.swp` - Vim swap files
 
-3. **Clean App Directory**:
+4. **Clean App Directory**:
    - Remove all files/directories from `/app` except excluded items
    - This ensures we start with a clean slate for symlinks
 
-4. **Create Symlinks**:
+5. **Create Symlinks**:
    - For each item in `/app/mounted-volume`, create a symlink in `/app`
+   - Verify source files are not symlinks themselves before creating links
    - Example: `/app/index.html` → `/app/mounted-volume/index.html`
 
 ### Runtime Behavior
@@ -85,11 +93,16 @@ The following directories and files are never synced:
 
 ### Common Issues
 
-1. **"Too many symbolic links" error**: This usually means symlinks are pointing to themselves. The current implementation prevents this by cleaning `/app` before creating symlinks.
+1. **"Too many symbolic links" error**: This usually means symlinks are pointing to themselves. The current implementation prevents this by:
+   - Cleaning symlinks from mounted volume on startup
+   - Cleaning `/app` before creating symlinks
+   - Verifying source files are not symlinks before creating new links
 
 2. **Files not persisting**: Check that the mounted volume is properly mounted in your container configuration.
 
 3. **Permission errors**: Ensure the container has read/write permissions for the mounted volume.
+
+4. **"recursive watch unavailable" error**: On Linux, recursive file watching isn't available. The system uses Vite's built-in watcher (chokidar) instead.
 
 ### Logging
 
@@ -115,8 +128,9 @@ const excludedFiles = []; // Add any specific files to exclude
 
 ## File Watcher
 
-The system uses two watching mechanisms:
-1. **Vite's built-in watcher**: Watches files through symlinks for content changes
-2. **Custom fs.watch**: Watches the mounted volume directory for file additions/deletions
+The system uses Vite's built-in watcher (powered by chokidar) to:
+1. Watch files through symlinks for content changes
+2. Monitor the mounted volume directory for file additions/deletions
+3. Automatically update symlinks when files are added or removed
 
-Both work together to ensure all changes are properly handled.
+This unified approach avoids platform-specific issues with native file watching.
