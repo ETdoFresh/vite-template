@@ -8,6 +8,27 @@ const mountedVolumeDir = '/app/mounted-volume';
 const excludedDirs = ['node_modules', '.git', 'mounted-volume', 'dist'];
 const excludedFiles = [];
 
+// Function to check if a file should be excluded
+function isExcluded(filename) {
+  // Check if it's in excluded directories
+  if (excludedDirs.includes(filename)) {
+    return true;
+  }
+  // Check if it's an excluded file
+  if (excludedFiles.includes(filename)) {
+    return true;
+  }
+  // Exclude Vite temporary timestamp files
+  if (filename.includes('.timestamp-') && filename.endsWith('.mjs')) {
+    return true;
+  }
+  // Exclude vim swap files
+  if (filename.startsWith('.') && filename.endsWith('.swp')) {
+    return true;
+  }
+  return false;
+}
+
 // Check if we're in build phase or runtime phase
 const isBuildPhase = process.env.NODE_ENV === 'production' && process.argv.includes('build');
 const isRuntime = !isBuildPhase && fs.existsSync(appDir);
@@ -41,7 +62,7 @@ function setupMountedVolume() {
     
     const allItems = fs.readdirSync(appDir);
     allItems.forEach(item => {
-      if (excludedDirs.includes(item) || excludedFiles.includes(item)) {
+      if (isExcluded(item)) {
         console.log(`  Skipping excluded item: ${item}`);
         return;
       }
@@ -80,7 +101,7 @@ function setupMountedVolume() {
   const appItems = fs.readdirSync(appDir);
   
   appItems.forEach(item => {
-    if (excludedDirs.includes(item) || excludedFiles.includes(item)) {
+    if (isExcluded(item)) {
       console.log(`  Keeping excluded item: ${item}`);
       return;
     }
@@ -123,7 +144,7 @@ function updateSymlinks() {
   
   // Remove symlinks that no longer have a corresponding file in mounted volume
   appItems.forEach(item => {
-    if (excludedDirs.includes(item) || excludedFiles.includes(item)) {
+    if (isExcluded(item)) {
       return; // Skip excluded items
     }
     
@@ -141,7 +162,7 @@ function updateSymlinks() {
   
   // Create symlinks for all items in mounted volume
   mountedItems.forEach(item => {
-    if (excludedDirs.includes(item) || excludedFiles.includes(item)) {
+    if (isExcluded(item)) {
       console.log(`  Skipping excluded item: ${item}`);
       return;
     }
@@ -211,23 +232,31 @@ export default defineConfig({
           return;
         }
         
-        // Set up a watcher for the mounted volume
-        const watcher = fs.watch(mountedVolumeDir, { recursive: true }, (eventType, filename) => {
-          if (!filename) return;
-          
-          // Skip excluded directories
-          if (excludedDirs.some(dir => filename.includes(dir))) {
-            return;
+        // Use Vite's built-in watcher to watch the mounted volume
+        // This works cross-platform and doesn't require recursive option
+        server.watcher.add(mountedVolumeDir);
+        
+        // Listen for file add/unlink events in mounted volume
+        server.watcher.on('add', (file) => {
+          if (file.startsWith(mountedVolumeDir)) {
+            const filename = path.relative(mountedVolumeDir, file);
+            if (!excludedDirs.some(dir => filename.includes(dir))) {
+              console.log(`\nFile added in mounted volume: ${filename}`);
+              console.log('Updating symlinks...');
+              updateSymlinks();
+            }
           }
-          
-          console.log(`\nDetected ${eventType} in mounted volume: ${filename}`);
-          console.log('Updating symlinks...');
-          updateSymlinks();
         });
         
-        // Clean up watcher on server close
-        server.httpServer?.on('close', () => {
-          watcher.close();
+        server.watcher.on('unlink', (file) => {
+          if (file.startsWith(mountedVolumeDir)) {
+            const filename = path.relative(mountedVolumeDir, file);
+            if (!excludedDirs.some(dir => filename.includes(dir))) {
+              console.log(`\nFile removed from mounted volume: ${filename}`);
+              console.log('Updating symlinks...');
+              updateSymlinks();
+            }
+          }
         });
       },
       handleHotUpdate({ file, server }) {
