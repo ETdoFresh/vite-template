@@ -3,17 +3,21 @@ version: '3.8'
 services:
   vite-app:
     image: node:20-alpine
-    container_name: vite-test-page
     working_dir: /app
     volumes:
       - app-data:/app
       - .:/vite-template:ro
       - /app/node_modules
-    ports:
-      - "5173:5173"
     command: sh -c "
       if [ ! -f /app/package.json ]; then
         echo 'First run detected, copying template files to volume...';
+
+        echo '📂 Files in /vite-template'
+        ls /vite-template
+
+        echo '📂 Files in /app'
+        ls /app
+
         cp -r /vite-template/* /app/ 2>/dev/null || true;
         cp -r /vite-template/.[^.]* /app/ 2>/dev/null || true;
       fi;
@@ -24,4 +28,3 @@ services:
 
 volumes:
   app-data:
-    name: app-data
