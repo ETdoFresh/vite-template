@@ -5,6 +5,7 @@ import { execSync } from 'child_process';
 const appDir = '/app';
 const mountedVolumeDir = '/app/mounted-volume';
 const excludedDirs = ['node_modules', '.git', 'mounted-volume', 'dist'];
+const excludedFiles = ['startup.js', 'sync-backup.js'];
 
 function isDirectoryEmpty(dir) {
   try {
@@ -44,8 +45,10 @@ export function setupMountedVolume() {
     console.log('Mounted volume contains data, using it as source of truth');
   }
   
-  // Get all items currently in /app (excluding our excluded dirs)
-  const appItems = fs.readdirSync(appDir).filter(item => !excludedDirs.includes(item));
+  // Get all items currently in /app (excluding our excluded dirs and files)
+  const appItems = fs.readdirSync(appDir).filter(item => 
+    !excludedDirs.includes(item) && !excludedFiles.includes(item)
+  );
   
   // Remove existing non-excluded items from /app (they'll be replaced with symlinks)
   appItems.forEach(item => {
@@ -68,8 +71,8 @@ export function setupMountedVolume() {
   const mountedItems = fs.readdirSync(mountedVolumeDir);
   
   mountedItems.forEach(item => {
-    // Skip excluded directories that might exist in mounted-volume
-    if (excludedDirs.includes(item)) {
+    // Skip excluded directories and files that might exist in mounted-volume
+    if (excludedDirs.includes(item) || excludedFiles.includes(item)) {
       console.log(`Skipping symlink for excluded item: ${item}`);
       return;
     }

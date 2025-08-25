@@ -1,5 +1,5 @@
 [phases.setup]
-# Install rsync for backup synchronization
+# Install rsync for initial file copy
 aptPkgs = ["rsync"]
 
 [phases.build]
@@ -7,5 +7,5 @@ aptPkgs = ["rsync"]
 cmds = ["npm install", "npm run build"]
 
 [start]
-# Start command - Vite will handle the backup sync via the plugin
+# Start command - runs startup.js which sets up mounted volume then starts Vite
 cmd = "npm start"
