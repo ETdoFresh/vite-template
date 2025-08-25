@@ -8,7 +8,8 @@
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
     "preview": "vite preview",
-    "sync-backup": "node sync-backup.js"
+    "sync-backup": "node sync-backup.js",
+    "sync-from-backup": "node -e \"import('./sync-backup.js').then(m => m.syncFromBackup())\""
   },
   "keywords": [],
   "author": "",
