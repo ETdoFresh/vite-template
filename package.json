@@ -7,7 +7,8 @@
     "start": "vite --host 0.0.0.0 --port 5173",
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "sync-backup": "node sync-backup.js"
   },
   "keywords": [],
   "author": "",

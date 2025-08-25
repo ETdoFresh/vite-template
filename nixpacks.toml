@@ -1,0 +1,11 @@
+[phases.setup]
+# Install rsync for backup synchronization
+aptPkgs = ["rsync"]
+
+[phases.build]
+# Build commands
+cmds = ["npm install", "npm run build"]
+
+[start]
+# Start command - Vite will handle the backup sync via the plugin
+cmd = "npm start"
