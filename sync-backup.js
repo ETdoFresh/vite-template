@@ -6,15 +6,13 @@ const backupDir = '/app/backup';
 const excludedDirs = ['node_modules', '.git', 'backup', 'dist'];
 
 export function createSymlinkBackup() {
-  // Remove existing backup directory if it exists
-  if (fs.existsSync(backupDir)) {
-    fs.rmSync(backupDir, { recursive: true, force: true });
-    console.log(`Removed existing backup directory: ${backupDir}`);
+  // Create backup directory if it doesn't exist
+  if (!fs.existsSync(backupDir)) {
+    fs.mkdirSync(backupDir, { recursive: true });
+    console.log(`Created backup directory: ${backupDir}`);
+  } else {
+    console.log(`Using existing backup directory: ${backupDir}`);
   }
-  
-  // Create backup directory
-  fs.mkdirSync(backupDir, { recursive: true });
-  console.log(`Created backup directory: ${backupDir}`);
   
   // Read all items in source directory
   const items = fs.readdirSync(sourceDir);
@@ -31,6 +29,11 @@ export function createSymlinkBackup() {
     const linkPath = path.join(backupDir, item);
     
     try {
+      // Remove existing symlink/file if it exists
+      if (fs.existsSync(linkPath)) {
+        fs.unlinkSync(linkPath);
+      }
+      
       // Create symlink
       fs.symlinkSync(sourcePath, linkPath);
       console.log(`Created symlink: ${item}`);
