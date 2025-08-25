@@ -1,7 +1,7 @@
 # Nixpacks configuration for Vite application
 
 [phases.setup]
-nixPkgs = ["nodejs_22"]
+nixPkgs = ["nodejs_22_12"]
 
 [phases.install]
 cmds = [
