@@ -1,12 +1,12 @@
 import { defineConfig } from 'vite';
-import { createSymlinkBackup } from './sync-backup.js';
+import { setupMountedVolume } from './sync-backup.js';
 
-// Vite plugin for symlink backup
-const backupSymlinkPlugin = () => ({
-  name: 'backup-symlink',
+// Vite plugin for mounted volume setup
+const mountedVolumePlugin = () => ({
+  name: 'mounted-volume',
   configureServer(server) {
-    // Create symlinks on server start
-    createSymlinkBackup();
+    // Setup mounted volume on server start
+    setupMountedVolume();
   }
 });
 
@@ -15,5 +15,5 @@ export default defineConfig({
     host: true,
     allowedHosts: ['.etdofresh.com']
   },
-  plugins: [backupSymlinkPlugin()]
+  plugins: [mountedVolumePlugin()]
 });
