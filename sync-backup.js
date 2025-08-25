@@ -68,10 +68,24 @@ export function setupMountedVolume() {
   const mountedItems = fs.readdirSync(mountedVolumeDir);
   
   mountedItems.forEach(item => {
+    // Skip excluded directories that might exist in mounted-volume
+    if (excludedDirs.includes(item)) {
+      console.log(`Skipping symlink for excluded item: ${item}`);
+      return;
+    }
+    
     const sourcePath = path.join(mountedVolumeDir, item);
     const linkPath = path.join(appDir, item);
     
     try {
+      // Check if target already exists (shouldn't happen after cleanup, but be safe)
+      if (fs.existsSync(linkPath)) {
+        const stats = fs.lstatSync(linkPath);
+        if (stats.isSymbolicLink()) {
+          fs.unlinkSync(linkPath);
+        }
+      }
+      
       // Create symlink from /app/item -> /app/mounted-volume/item
       fs.symlinkSync(sourcePath, linkPath);
       console.log(`Created symlink: /app/${item} -> /app/mounted-volume/${item}`);
