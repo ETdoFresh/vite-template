@@ -4,19 +4,12 @@
 nixPkgs = ["nodejs_20"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = [
+  "echo 'Setting up Vite application...'",
+  "npm install"
+]
 
-# Production mode (commented out):
-# [phases.build]
-# cmds = ["npm run build"]
-# 
-# [start]
-# cmd = "npm run preview -- --host 0.0.0.0 --port ${PORT:-4173}"
-# 
-# [variables]
-# NODE_ENV = "production"
-
-# Development mode:
+# For development with hot reload
 [start]
 cmd = "npm run dev -- --host 0.0.0.0 --port ${PORT:-5173}"
 
