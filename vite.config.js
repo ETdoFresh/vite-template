@@ -309,8 +309,8 @@ export default defineConfig({
     {
       name: 'startup-and-sync',
       configureServer(server) {
-        // Call startup function when server starts
-        startup();
+        // Call startup function when server starts, passing the server object
+        startup(server);
         // Only set up watcher at runtime
         if (!isRuntime || !fs.existsSync(mountedVolumeDir)) {
           return;
