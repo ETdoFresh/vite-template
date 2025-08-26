@@ -2,11 +2,12 @@ import { defineConfig } from 'vite';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import startup from './startup.js';
 
 const appDir = '/app';
 const mountedVolumeDir = '/app/mounted-volume';
 const excludedDirs = ['node_modules', '.git', 'mounted-volume', 'dist'];
-const excludedFiles = [];
+const excludedFiles = ['startup.js'];
 
 // Function to check if a file should be excluded
 function isExcluded(filename) {
@@ -272,6 +273,15 @@ export default defineConfig({
     {
       name: 'sync-symlinks-on-change',
       configureServer(server) {
+        // Call the user's startup hook
+        try {
+          if (typeof startup === 'function') {
+            startup();
+          }
+        } catch (error) {
+          console.error('Error running startup hook:', error);
+        }
+        
         // Only set up watcher at runtime
         if (!isRuntime || !fs.existsSync(mountedVolumeDir)) {
           return;
