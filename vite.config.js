@@ -3,40 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
-// Try to import startup function, fallback to default if not available
-let startup;
-try {
-  const startupModule = await import('./startup.js');
-  startup = startupModule.startup;
-} catch (error) {
-  console.log('⚠️  startup.js not found, using default startup function');
-  startup = () => {
-    console.log('🚀 Vite server started (default startup)');
-    console.log('📅 Server started at:', new Date().toISOString());
-  };
-}
-
-// Load environment variables manually without dotenv
-function loadEnv() {
-  try {
-    const envFile = fs.readFileSync('.env', 'utf-8');
-    const lines = envFile.split('\n');
-    for (const line of lines) {
-      if (line && !line.startsWith('#')) {
-        const [key, ...valueParts] = line.split('=');
-        if (key) {
-          process.env[key.trim()] = valueParts.join('=').trim();
-        }
-      }
-    }
-  } catch (error) {
-    console.log('⚠️  No .env file found, using existing environment variables');
-  }
-}
-
-// Load environment variables
-loadEnv();
-
+// Define paths and exclusions first
 const appDir = '/app';
 const mountedVolumeDir = '/app/mounted-volume';
 const excludedDirs = ['node_modules', '.git', 'mounted-volume', 'dist'];
@@ -281,9 +248,44 @@ function updateSymlinks() {
   });
 }
 
-// Only setup mounted volume at runtime, not during build
+// Setup mounted volume first (before loading any config or startup scripts)
+// Only run at runtime, not during build
 if (!isBuildPhase) {
   setupMountedVolume();
+}
+
+// Load environment variables after mounting is complete
+function loadEnv() {
+  try {
+    const envFile = fs.readFileSync('.env', 'utf-8');
+    const lines = envFile.split('\n');
+    for (const line of lines) {
+      if (line && !line.startsWith('#')) {
+        const [key, ...valueParts] = line.split('=');
+        if (key) {
+          process.env[key.trim()] = valueParts.join('=').trim();
+        }
+      }
+    }
+  } catch (error) {
+    console.log('⚠️  No .env file found, using existing environment variables');
+  }
+}
+
+// Load environment variables
+loadEnv();
+
+// Try to import startup function after mounting and env vars are loaded
+let startup;
+try {
+  const startupModule = await import('./startup.js');
+  startup = startupModule.startup;
+} catch (error) {
+  console.log('⚠️  startup.js not found, using default startup function');
+  startup = () => {
+    console.log('🚀 Vite server started (default startup)');
+    console.log('📅 Server started at:', new Date().toISOString());
+  };
 }
 
 export default defineConfig({
