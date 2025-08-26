@@ -2,25 +2,47 @@ import { defineConfig } from 'vite';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import { handleCompletion } from './api-handler.js';
+
+// Try to import startup function, fallback to default if not available
+let startup;
+try {
+  const startupModule = await import('./startup.js');
+  startup = startupModule.startup;
+} catch (error) {
+  console.log('⚠️  startup.js not found, using default startup function');
+  startup = () => {
+    console.log('🚀 Vite server started (default startup)');
+    console.log('📅 Server started at:', new Date().toISOString());
+  };
+}
+
+// Load environment variables manually without dotenv
+function loadEnv() {
+  try {
+    const envFile = fs.readFileSync('.env', 'utf-8');
+    const lines = envFile.split('\n');
+    for (const line of lines) {
+      if (line && !line.startsWith('#')) {
+        const [key, ...valueParts] = line.split('=');
+        if (key) {
+          process.env[key.trim()] = valueParts.join('=').trim();
+        }
+      }
+    }
+  } catch (error) {
+    console.log('⚠️  No .env file found, using existing environment variables');
+  }
+}
+
+// Load environment variables
+loadEnv();
 
 const appDir = '/app';
 const mountedVolumeDir = '/app/mounted-volume';
 const excludedDirs = ['node_modules', '.git', 'mounted-volume', 'dist'];
 const excludedFiles = [];
 
-// Custom startup function - runs when Vite server starts
-function startup() {
-  console.log('🚀 Vite server startup hook executed');
-  console.log('📅 Server started at:', new Date().toISOString());
-  
-  // Add your custom startup logic here
-  // Examples:
-  // - Initialize database connections
-  // - Load environment variables
-  // - Set up external service connections
-  // - Run data migrations
-  // - Clear temporary files
-}
 
 // Function to check if a file should be excluded
 function isExcluded(filename) {
