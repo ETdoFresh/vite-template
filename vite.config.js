@@ -2,7 +2,6 @@ import { defineConfig } from 'vite';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
-import { handleCompletion } from './api-handler.js';
 
 // Try to import startup function, fallback to default if not available
 let startup;
