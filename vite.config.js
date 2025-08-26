@@ -2,12 +2,25 @@ import { defineConfig } from 'vite';
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
-import startup from './startup.js';
 
 const appDir = '/app';
 const mountedVolumeDir = '/app/mounted-volume';
 const excludedDirs = ['node_modules', '.git', 'mounted-volume', 'dist'];
-const excludedFiles = ['startup.js'];
+const excludedFiles = [];
+
+// Custom startup function - runs when Vite server starts
+function startup() {
+  console.log('🚀 Vite server startup hook executed');
+  console.log('📅 Server started at:', new Date().toISOString());
+  
+  // Add your custom startup logic here
+  // Examples:
+  // - Initialize database connections
+  // - Load environment variables
+  // - Set up external service connections
+  // - Run data migrations
+  // - Clear temporary files
+}
 
 // Function to check if a file should be excluded
 function isExcluded(filename) {
@@ -271,17 +284,10 @@ export default defineConfig({
   },
   plugins: [
     {
-      name: 'sync-symlinks-on-change',
+      name: 'startup-and-sync',
       configureServer(server) {
-        // Call the user's startup hook
-        try {
-          if (typeof startup === 'function') {
-            startup();
-          }
-        } catch (error) {
-          console.error('Error running startup hook:', error);
-        }
-        
+        // Call startup function when server starts
+        startup();
         // Only set up watcher at runtime
         if (!isRuntime || !fs.existsSync(mountedVolumeDir)) {
           return;
