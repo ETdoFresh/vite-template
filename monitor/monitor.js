@@ -7,6 +7,7 @@ const APP_PATH = '/app';
 const MONITOR_PATH = '/monitor';
 
 console.log('Starting file monitor service...');
+console.log(`Paths: VOLUME=${VOLUME_PATH}, APP=${APP_PATH}, MONITOR=${MONITOR_PATH}`);
 
 async function ensureDirectories() {
   console.log('Ensuring directories exist...');
@@ -28,6 +29,7 @@ async function initializeVolume() {
       
       if (await fs.pathExists(sourcePath)) {
         console.log(`Copying ${file} to volume...`);
+        console.log(`  Full paths: ${sourcePath} -> ${destPath}`);
         await fs.copy(sourcePath, destPath, { overwrite: false });
       }
     }
@@ -121,6 +123,7 @@ async function startFileWatcher() {
       
       const appPath = path.join(APP_PATH, relativePath);
       console.log(`File added: ${relativePath}`);
+      console.log(`  Full paths: ${volumePath} -> ${appPath}`);
       await createSymlink(volumePath, appPath);
     })
     .on('addDir', async (volumePath) => {
@@ -133,6 +136,7 @@ async function startFileWatcher() {
       
       const appPath = path.join(APP_PATH, relativePath);
       console.log(`Directory added: ${relativePath}`);
+      console.log(`  Full paths: ${volumePath} -> ${appPath}`);
       await createSymlink(volumePath, appPath);
     })
     .on('unlink', async (volumePath) => {
@@ -145,6 +149,7 @@ async function startFileWatcher() {
       
       const appPath = path.join(APP_PATH, relativePath);
       console.log(`File removed: ${relativePath}`);
+      console.log(`  Full path: ${appPath}`);
       await removeSymlink(appPath);
     })
     .on('unlinkDir', async (volumePath) => {
@@ -157,6 +162,7 @@ async function startFileWatcher() {
       
       const appPath = path.join(APP_PATH, relativePath);
       console.log(`Directory removed: ${relativePath}`);
+      console.log(`  Full path: ${appPath}`);
       await removeSymlink(appPath);
     })
     .on('error', error => console.error('Watcher error:', error));
