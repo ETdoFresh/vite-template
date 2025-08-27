@@ -82,6 +82,11 @@ async function syncVolumeToApp() {
   const items = await fs.readdir(VOLUME_PATH);
   
   for (const item of items) {
+    // Skip node_modules directories
+    if (item === 'node_modules' || item.includes('node_modules')) {
+      continue;
+    }
+    
     const volumePath = path.join(VOLUME_PATH, item);
     const appPath = path.join(APP_PATH, item);
     await createSymlink(volumePath, appPath);
@@ -98,6 +103,7 @@ async function startFileWatcher() {
     ignoreInitial: true,
     followSymlinks: false,
     depth: 99,
+    ignored: ['**/node_modules/**', '**/node_modules'],
     awaitWriteFinish: {
       stabilityThreshold: 500,
       pollInterval: 100
@@ -107,24 +113,48 @@ async function startFileWatcher() {
   watcher
     .on('add', async (volumePath) => {
       const relativePath = path.relative(VOLUME_PATH, volumePath);
+      
+      // Skip node_modules
+      if (relativePath.includes('node_modules')) {
+        return;
+      }
+      
       const appPath = path.join(APP_PATH, relativePath);
       console.log(`File added: ${relativePath}`);
       await createSymlink(volumePath, appPath);
     })
     .on('addDir', async (volumePath) => {
       const relativePath = path.relative(VOLUME_PATH, volumePath);
+      
+      // Skip node_modules
+      if (relativePath.includes('node_modules')) {
+        return;
+      }
+      
       const appPath = path.join(APP_PATH, relativePath);
       console.log(`Directory added: ${relativePath}`);
       await createSymlink(volumePath, appPath);
     })
     .on('unlink', async (volumePath) => {
       const relativePath = path.relative(VOLUME_PATH, volumePath);
+      
+      // Skip node_modules
+      if (relativePath.includes('node_modules')) {
+        return;
+      }
+      
       const appPath = path.join(APP_PATH, relativePath);
       console.log(`File removed: ${relativePath}`);
       await removeSymlink(appPath);
     })
     .on('unlinkDir', async (volumePath) => {
       const relativePath = path.relative(VOLUME_PATH, volumePath);
+      
+      // Skip node_modules
+      if (relativePath.includes('node_modules')) {
+        return;
+      }
+      
       const appPath = path.join(APP_PATH, relativePath);
       console.log(`Directory removed: ${relativePath}`);
       await removeSymlink(appPath);
