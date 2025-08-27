@@ -51,14 +51,25 @@ async function createSymlink(volumePath, appPath) {
     await fs.ensureDir(path.dirname(appPath));
     
     const volumeStats = await fs.stat(volumePath);
-    if (volumeStats.isDirectory()) {
+    
+    // For directories that contain source code, copy instead of symlink
+    // This prevents build artifacts from being written back to volume
+    const relativePath = path.relative(VOLUME_PATH, volumePath);
+    const isSourceDir = relativePath.startsWith('frontend') || 
+                        relativePath.startsWith('backend') || 
+                        relativePath.startsWith('service');
+    
+    if (volumeStats.isDirectory() && isSourceDir) {
+      console.log(`Copying directory: ${appPath} <- ${volumePath}`);
+      await fs.copy(volumePath, appPath, { overwrite: true });
+    } else if (volumeStats.isDirectory()) {
       await fs.ensureDir(volumePath);
       await fs.symlink(volumePath, appPath, 'dir');
+      console.log(`Symlink created: ${appPath} -> ${volumePath}`);
     } else {
       await fs.symlink(volumePath, appPath, 'file');
+      console.log(`Symlink created: ${appPath} -> ${volumePath}`);
     }
-    
-    console.log(`Symlink created: ${appPath} -> ${volumePath}`);
   } catch (error) {
     console.error(`Error creating symlink for ${volumePath}:`, error.message);
   }
