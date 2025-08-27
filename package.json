@@ -1,19 +1,19 @@
 {
-  "name": "test-page",
+  "name": "vite-template-monorepo",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Monorepo with frontend, backend, and proxy service",
   "scripts": {
-    "start": "vite",
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install && cd ../service && npm install",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:service": "cd service && npm run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:service\"",
+    "start:frontend": "cd frontend && npm run build && npm run preview",
+    "start:backend": "cd backend && npm start",
+    "start:service": "cd service && npm start",
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\" \"npm run start:service\""
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
   "devDependencies": {
-    "vite": "^5.0.0"
+    "concurrently": "^8.2.2"
   }
 }
