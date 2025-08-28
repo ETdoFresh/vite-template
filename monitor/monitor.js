@@ -17,7 +17,14 @@ async function ensureDirectories() {
 }
 
 async function initializeVolume() {
-  const volumeEmpty = (await fs.readdir(VOLUME_PATH)).length === 0;
+  const volumeContents = await fs.readdir(VOLUME_PATH);
+  const volumeEmpty = volumeContents.length === 0;
+  
+  console.log(`Volume contains ${volumeContents.length} item(s)`);
+  if (volumeContents.length > 0) {
+    const itemsToShow = volumeContents.slice(0, 5);
+    console.log(`First ${Math.min(5, volumeContents.length)} items:`, itemsToShow);
+  }
   
   if (volumeEmpty) {
     console.log('Volume is empty, copying initial files...');
