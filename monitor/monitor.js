@@ -17,10 +17,11 @@ async function ensureDirectories() {
 }
 
 async function initializeVolume() {
-  const volumeContents = await fs.readdir(VOLUME_PATH);
+  const allContents = await fs.readdir(VOLUME_PATH);
+  const volumeContents = allContents.filter(item => item !== 'node_modules');
   const volumeEmpty = volumeContents.length === 0;
   
-  console.log(`Volume contains ${volumeContents.length} item(s)`);
+  console.log(`Volume contains ${volumeContents.length} item(s) (excluding node_modules)`);
   if (volumeContents.length > 0) {
     const itemsToShow = volumeContents.slice(0, 5);
     console.log(`First ${Math.min(5, volumeContents.length)} items:`, itemsToShow);
