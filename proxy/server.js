@@ -27,7 +27,7 @@ app.use('/', createProxyMiddleware({
 }));
 
 app.listen(PORT, () => {
-  console.log(`Service proxy running on port ${PORT}`);
+  console.log(`Proxy running on port ${PORT}`);
   console.log(`Proxying /api/* requests to ${BACKEND_URL}`);
   console.log(`Proxying all other requests to ${FRONTEND_URL}`);
 });

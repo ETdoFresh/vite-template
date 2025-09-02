@@ -3,22 +3,22 @@ FROM node:20-alpine
 # Install dependencies for file watching
 RUN apk add --no-cache bash
 
-# Set up monitor directory
-WORKDIR /monitor
-COPY monitor/package*.json ./
-RUN npm install
+WORKDIR /app
 
-# Copy monitor script
-COPY monitor/monitor.js ./
-
-# Copy application files to monitor directory
+# Copy only package manifests first for better Docker layer caching
 COPY package*.json ./
-COPY frontend ./frontend
-COPY backend ./backend
-COPY service ./service
+COPY frontend/package*.json ./frontend/
+COPY backend/package*.json ./backend/
+COPY proxy/package*.json ./proxy/
 
-# Create app and volume directories
-RUN mkdir -p /app /volume
+# Install all workspaces (root, frontend, backend, proxy)
+RUN npm run install:all
 
-# Start the monitor service
-CMD ["node", "monitor.js"]
+# Copy the rest of the source
+COPY . .
+
+# Expose dev ports
+EXPOSE 3000
+
+# Start all services concurrently
+CMD ["npm", "start"]

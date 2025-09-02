@@ -1,5 +1,5 @@
 {
-  "name": "service",
+  "name": "proxy",
   "version": "1.0.0",
   "description": "Proxy service to consolidate frontend and backend",
   "main": "server.js",
