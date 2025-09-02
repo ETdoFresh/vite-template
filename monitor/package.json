@@ -1,0 +1,13 @@
+{
+  "name": "file-monitor",
+  "version": "1.0.0",
+  "description": "File monitor and symlink manager for Docker volumes",
+  "main": "monitor.js",
+  "scripts": {
+    "start": "node monitor.js"
+  },
+  "dependencies": {
+    "chokidar": "^3.5.3",
+    "fs-extra": "^11.1.1"
+  }
+}

@@ -135,11 +135,52 @@
             font-size: 1.2em;
             color: #667eea;
             font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .health-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-left: 15px;
+            border-left: 2px solid #e0e0e0;
+        }
+        
+        .health-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ccc;
+            transition: all 0.3s ease;
+        }
+        
+        .health-indicator.healthy {
+            background: #4caf50;
+            box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+        }
+        
+        .health-indicator.error {
+            background: #f44336;
+            box-shadow: 0 0 8px rgba(244, 67, 54, 0.5);
+        }
+        
+        .health-text {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 500;
         }
     </style>
 </head>
 <body>
-    <div class="time-display" id="timeDisplay"></div>
+    <div class="time-display" id="timeDisplay">
+        <span id="timeText"></span>
+        <div class="health-status">
+            <div class="health-indicator" id="healthIndicator"></div>
+            <span class="health-text" id="healthText">Checking...</span>
+        </div>
+    </div>
     
     <div class="container">
         <h1>Interactive Test Page</h1>
@@ -165,7 +206,9 @@
         const counterElement = document.getElementById('counter');
         const messageBox = document.getElementById('messageBox');
         const userInput = document.getElementById('userInput');
-        const timeDisplay = document.getElementById('timeDisplay');
+        const timeText = document.getElementById('timeText');
+        const healthIndicator = document.getElementById('healthIndicator');
+        const healthText = document.getElementById('healthText');
 
         // Counter functions
         function increment() {
@@ -220,12 +263,36 @@
                 minute: '2-digit',
                 second: '2-digit'
             });
-            timeDisplay.textContent = timeString;
+            timeText.textContent = timeString;
         }
 
-        // Initialize time and update every second
+        // Check backend health status
+        async function checkHealth() {
+            try {
+                const response = await fetch('/api/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    healthIndicator.className = 'health-indicator healthy';
+                    healthText.textContent = 'Backend: Healthy';
+                } else {
+                    healthIndicator.className = 'health-indicator error';
+                    healthText.textContent = 'Backend: Error';
+                }
+            } catch (error) {
+                healthIndicator.className = 'health-indicator error';
+                healthText.textContent = 'Backend: Offline';
+            }
+        }
+
+        // Initialize time and health check
         updateTime();
+        checkHealth();
+        
+        // Update time every second
         setInterval(updateTime, 1000);
+        
+        // Check health every 5 seconds
+        setInterval(checkHealth, 5000);
 
         // Add some interactive console messages
         console.log('%c Welcome to the Test Page! ', 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-size: 20px; padding: 10px;');
