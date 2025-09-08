@@ -16,11 +16,19 @@ COPY terminal/backend/package*.json ./terminal/backend/
 # Install all workspaces (root, frontend, backend, proxy)
 RUN npm run install:all
 
+# Install codex
+RUN npm install -g @openai/codex
+
 # Copy the rest of the source
 COPY . .
 
 # Expose dev ports
 EXPOSE 3000
 
+# Add entrypoint to materialize ~/.codex/auth.json from env
+COPY docker/codex-auth-bootstrap.sh /usr/local/bin/codex-auth-bootstrap.sh
+RUN chmod +x /usr/local/bin/codex-auth-bootstrap.sh
+
 # Start all services concurrently
+ENTRYPOINT ["/usr/local/bin/codex-auth-bootstrap.sh"]
 CMD ["npm", "start"]
