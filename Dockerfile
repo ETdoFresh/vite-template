@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
-# Install dependencies for file watching
-RUN apk add --no-cache bash
+# Install dependencies for native builds (node-pty) and dev tooling
+RUN apk add --no-cache bash python3 make g++ pkgconf
 
 WORKDIR /app
 
@@ -10,6 +10,8 @@ COPY package*.json ./
 COPY frontend/package*.json ./frontend/
 COPY backend/package*.json ./backend/
 COPY proxy/package*.json ./proxy/
+COPY terminal/frontend/package*.json ./terminal/frontend/
+COPY terminal/backend/package*.json ./terminal/backend/
 
 # Install all workspaces (root, frontend, backend, proxy)
 RUN npm run install:all

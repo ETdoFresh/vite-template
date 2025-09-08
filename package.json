@@ -3,15 +3,20 @@
   "version": "1.0.0",
   "description": "Monorepo with frontend, backend, and proxy",
   "scripts": {
-    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install && cd ../proxy && npm install",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install && cd ../proxy && npm install && cd ../terminal/frontend && npm install && cd ../backend && npm install",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd backend && npm run dev",
     "dev:proxy": "cd proxy && npm run dev",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:proxy\"",
+    "dev:terminal:frontend": "cd terminal/frontend && npm run dev",
+    "dev:terminal:backend": "cd terminal/backend && npm start",
+    "dev:terminal": "concurrently \"npm run dev:terminal:backend\" \"npm run dev:terminal:frontend\"",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:proxy\" \"npm run dev:terminal\"",
     "start:frontend": "cd frontend && npm run dev",
     "start:backend": "cd backend && npm start",
     "start:proxy": "cd proxy && npm start",
-    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\" \"npm run start:proxy\""
+    "start:terminal:frontend": "cd terminal/frontend && npm run dev",
+    "start:terminal:backend": "cd terminal/backend && npm start",
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\" \"npm run start:proxy\" \"npm run start:terminal:backend\" \"npm run start:terminal:frontend\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
