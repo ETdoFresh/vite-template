@@ -101,7 +101,12 @@ wss.on('connection', (ws, req) => {
       let msg;
       try { msg = JSON.parse(raw.toString()); } catch { return; }
       if (msg.type === 'input') {
-        session.pty.write(msg.data);
+        // Normalize line endings: many sources (e.g., STT/mic) may send "\n"
+        // but PTYs typically expect "\r" for Enter. Convert CRLF -> CR and
+        // lone LF -> CR so Enter actually submits in shells/programs.
+        const data = String(msg.data ?? '');
+        const normalized = data.replace(/\r\n/g, '\r').replace(/\n/g, '\r');
+        session.pty.write(normalized);
       } else if (msg.type === 'resize') {
         const cols = Number(msg.cols) || 80;
         const rows = Number(msg.rows) || 24;
