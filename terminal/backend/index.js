@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import pty from 'node-pty';
 import { randomUUID } from 'crypto';
+import { existsSync, statSync } from 'fs';
 
 const PORT = process.env.TERMINAL_PORT ? Number(process.env.TERMINAL_PORT) : 4001;
 const app = express();
@@ -10,6 +11,15 @@ app.use(express.json());
 
 // Session store in-memory
 const sessions = new Map(); // id -> { id, createdAt, pty, clients: Set<ws> }
+
+function getStartCwd() {
+  try {
+    if (existsSync('/app') && statSync('/app').isDirectory()) {
+      return '/app';
+    }
+  } catch {}
+  return process.cwd();
+}
 
 function createSession() {
   const id = randomUUID();
@@ -19,7 +29,7 @@ function createSession() {
     name: 'xterm-256color',
     cols: 80,
     rows: 24,
-    cwd: process.cwd(),
+    cwd: getStartCwd(),
     env: { ...process.env, TERM: 'xterm-256color' },
   });
 
@@ -111,4 +121,3 @@ wss.on('connection', (ws, req) => {
 server.listen(PORT, () => {
   console.log(`[terminal-backend] listening on http://localhost:${PORT}`);
 });
-
